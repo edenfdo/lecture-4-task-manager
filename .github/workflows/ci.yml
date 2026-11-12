@@ -1,0 +1,49 @@
+name: Task Manager Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - index.html
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t task-manager:latest .
+
+      - name: Run application and tests
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            task-manager:latest
+
+      - name: Commit generated HTML
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "No HTML changes to commit"
+          else
+            git commit -m "Update generated task manager report"
+            git push
+          fi
